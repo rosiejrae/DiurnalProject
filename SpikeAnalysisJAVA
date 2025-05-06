@@ -1,0 +1,130 @@
+// SpikeAnalysis.java
+
+import java.util.*;
+import java.io.*;
+
+public class SpikeAnalysis {
+
+    // --- Data Structures ---
+    static class Spike {
+        String unitID;
+        double timestamp;
+        String estrusPhase;
+        String lightCycle;
+
+        Spike(String unitID, double timestamp, String estrusPhase, String lightCycle) {
+            this.unitID = unitID;
+            this.timestamp = timestamp;
+            this.estrusPhase = estrusPhase;
+            this.lightCycle = lightCycle;
+        }
+    }
+
+    static class Metrics {
+        String unitID;
+        double ISI;
+        double firingRate;
+        int spikeNum;
+
+        Metrics(String unitID, double ISI, double firingRate, int spikeNum) {
+            this.unitID = unitID;
+            this.ISI = ISI;
+            this.firingRate = firingRate;
+            this.spikeNum = spikeNum;
+        }
+    }
+
+    static Metrics computeMetrics(String unitID, List<Double> timestamps) {
+        Collections.sort(timestamps);
+        double ISI = 0;
+        double firingRate = 0;
+        int n = timestamps.size();
+
+        if (n > 1) {
+            double totalISI = 0;
+            for (int i = 1; i < n; i++) {
+                totalISI += (timestamps.get(i) - timestamps.get(i - 1));
+            }
+            ISI = totalISI / (n - 1);
+            firingRate = ISI > 0 ? 1.0 / ISI : 0;
+        }
+        return new Metrics(unitID, ISI, firingRate, n);
+    }
+
+    public static void main(String[] args) {
+
+        // === Section 1: Experiment Info ===
+        int animalNum = 206797;
+        String estrusPhase = "M";
+        String lightCycle = "D";
+
+        double BLsec = 15 * 60;
+        double FsStartSec = 16 * 60;
+        double FsDoneSec = 21 * 60;
+        double clon25Sec = (21.5 + 25) * 60;
+        double clon30Sec = (21.5 + 30) * 60;
+
+        // === Section 2: Load & Segment Data (mock example) ===
+        List<Spike> spikeData = new ArrayList<>();
+        spikeData.add(new Spike("206797_1_1", 100.0, estrusPhase, lightCycle));
+        spikeData.add(new Spike("206797_1_1", 105.0, estrusPhase, lightCycle));
+        spikeData.add(new Spike("206797_1_1", 115.0, estrusPhase, lightCycle));
+        // Add more spikes as needed
+
+        Map<String, List<Double>> BL = new HashMap<>();
+        Map<String, List<Double>> FS = new HashMap<>();
+        Map<String, List<Double>> CLON25 = new HashMap<>();
+
+        for (Spike spike : spikeData) {
+            double ts = spike.timestamp;
+            if (ts < BLsec) {
+                BL.computeIfAbsent(spike.unitID, k -> new ArrayList<>()).add(ts);
+            } else if (ts > FsStartSec && ts < FsDoneSec) {
+                FS.computeIfAbsent(spike.unitID, k -> new ArrayList<>()).add(ts);
+            } else if (ts > clon25Sec && ts < clon30Sec) {
+                CLON25.computeIfAbsent(spike.unitID, k -> new ArrayList<>()).add(ts);
+            }
+        }
+
+        // === Section 3: Compute ISI & Firing Rate ===
+        Map<String, Metrics> BL_metrics = new HashMap<>();
+        Map<String, Metrics> FS_metrics = new HashMap<>();
+        Map<String, Metrics> CLON_metrics = new HashMap<>();
+
+        for (String uid : BL.keySet()) {
+            BL_metrics.put(uid, computeMetrics(uid, BL.get(uid)));
+        }
+        for (String uid : FS.keySet()) {
+            FS_metrics.put(uid, computeMetrics(uid, FS.get(uid)));
+        }
+        for (String uid : CLON25.keySet()) {
+            CLON_metrics.put(uid, computeMetrics(uid, CLON25.get(uid)));
+        }
+
+        // === Section 4: Clonidine Sensitivity Assessment ===
+        System.out.println("\nClonidine-Sensitive Units (\u226550% FR drop):");
+        List<String> clonSensitiveUnits = new ArrayList<>();
+
+        for (String unitID : BL_metrics.keySet()) {
+            double blFR = BL_metrics.get(unitID).firingRate;
+            double clonFR = CLON_metrics.containsKey(unitID) ? CLON_metrics.get(unitID).firingRate : 0;
+            double changeFromBL = blFR > 0 ? (clonFR - blFR) / blFR : 0;
+
+            if (changeFromBL <= -0.5) {
+                clonSensitiveUnits.add(unitID);
+                System.out.printf("%s | BLFR: %.2f | ClonFR: %.2f | ∆: %.1f%%%n",
+                        unitID, blFR, clonFR, changeFromBL * 100);
+            }
+        }
+
+        // === Section 5: Filter Spikes for Raster ===
+        List<Spike> rasterSpikes = new ArrayList<>();
+        for (Spike spike : spikeData) {
+            if (clonSensitiveUnits.contains(spike.unitID)) {
+                rasterSpikes.add(spike);
+            }
+        }
+
+        System.out.println("\nFiltered raster spike count: " + rasterSpikes.size());
+    }
+}
