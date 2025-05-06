@@ -1,0 +1,60 @@
+result = sixNASpikes;
+figure;
+hold on;
+
+% Define colors
+orange = [1 0.5 0];
+blue = [0 0 1];
+red = [1 0 0]; % Define color for 'X'
+darkGreen = [0 0.5 0]; % Define darker green color
+darkRed = [0.5 0 0]; % Define darker red color
+
+% Find unique units for each lightCycle
+L_units = unique(result.unitID(result.lightCycle == 'L'));
+D_units = unique(result.unitID(result.lightCycle == 'D'));
+X_units = unique(result.unitID(result.lightCycle == 'X'));
+
+% Combine the units with L first, then D, then X
+combinedUnits = [L_units; D_units; X_units];
+countUnits = length(combinedUnits) + 1;
+
+% Loop through combined units and plot
+for i = 1:length(combinedUnits)
+    unitRows = result.unitID == combinedUnits(i);
+    unitTimestamp = result.adjustedTimestamp(unitRows) / 60; % Convert to minutes
+    lightCycle = result.lightCycle(find(unitRows, 1, 'first')); % Get the lightCycle value for this unit
+    
+    % Determine the color based on the lightCycle
+    if lightCycle == 'L'
+        color = orange;
+    elseif lightCycle == 'D'
+        color = blue;
+    elseif lightCycle == 'X'
+        color = red;
+    end
+    
+    scatter(unitTimestamp, ones(size(unitTimestamp)) * i, 200, color, 'Marker', '|', 'SizeData', 20);
+end
+
+% Plot vertical lines after scatter plots to bring them to the front
+line([15,15], [1,countUnits], 'Color', 'K', 'LineWidth', 1.5); % Use darker green
+line([20,20], [1,countUnits], 'Color', 'k', 'LineWidth', 1.5);
+line([45,45], [1,countUnits], 'Color', 'k', 'LineWidth', 1.5);
+
+xMin = 0;
+xMax = 20;
+
+xlim([xMin, xMax]);
+
+xlabel('Time(min)');
+ylabel('Unit');
+%title('Neuron Firing Across Time');
+
+yticks(1:length(combinedUnits));
+yticklabels(arrayfun(@num2str, combinedUnits, 'UniformOutput', false));
+set(gca, 'YDir', 'reverse');
+
+% Set the y-axis limit to match the actual number of units plotted
+ylim([1, countUnits - 1]); % Adjust countUnits - 1 to avoid extra space
+
+hold off;
