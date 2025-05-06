@@ -1,0 +1,34 @@
+# ==== Epoch Segmentation ====
+
+# Get unit list
+unique_units = Data['unitID'].unique()
+
+# Segment by timestamp
+BL_spikes = Data[Data['timestamp'] < BL_sec].copy()
+FS_spikes = Data[(Data['timestamp'] > FsStart_sec) & (Data['timestamp'] < FsDone_sec)].copy()
+rest_spikes = Data[(Data['timestamp'] > FsDone_sec) & (Data['timestamp'] < ClonInject_sec)].copy()
+cloninject_spikes = Data[(Data['timestamp'] > ClonInject_sec) & (Data['timestamp'] < clon30_sec)].copy()
+clon25_spikes = Data[(Data['timestamp'] > clon25_sec) & (Data['timestamp'] < clon30_sec)].copy()
+
+# ==== Function to calculate ISI, FiringRate, and SpikeNum ====
+
+def compute_unit_metrics(df):
+    measures = pd.DataFrame(columns=["unitID", "ISI", "FiringRate", "SpikeNum"])
+    
+    for unit in df['unitID'].unique():
+        unit_data = df[df['unitID'] == unit]
+        timestamps = unit_data['timestamp'].values
+        ISI = np.mean(np.diff(timestamps)) if len(timestamps) > 1 else 0
+        firing_rate = 1 / ISI if ISI > 0 else 0
+        spike_num = len(timestamps)
+        measures = pd.concat([
+            measures,
+            pd.DataFrame([[unit, ISI, firing_rate, spike_num]], columns=measures.columns)
+        ])
+    
+    return measures.reset_index(drop=True)
+
+# Calculate for each epoch
+BL_aves = compute_unit_metrics(BL_spikes)
+FS_aves = compute_unit_metrics(FS_spikes)
+Clon5_aves = compute_unit_metrics(clon25_spikes)
