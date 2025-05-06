@@ -1,0 +1,37 @@
+# ==== Pull all spikes from clon-sensitive units ====
+clon_sens_ids = clon_sens_epoch_by_unit['unitID']
+
+# Matching rows from original Data
+clon_sen_spikes = Data[Data['unitID'].isin(clon_sens_ids)].copy()
+sio.savemat(f'clonSenSpikes{animal_num}.mat', {'clonSenSpikes': clon_sen_spikes.to_dict("list")})
+
+# Matching rows from each epoch
+Na_BL_aves = BL_aves[BL_aves['unitID'].isin(clon_sens_ids)].copy()
+sio.savemat(f'NaBLAves{animal_num}.mat', {'NaBLAves': Na_BL_aves.to_dict("list")})
+
+Na_FS_aves = FS_aves[FS_aves['unitID'].isin(clon_sens_ids)].copy()
+sio.savemat(f'NaFsAves{animal_num}.mat', {'NaFsAves': Na_FS_aves.to_dict("list")})
+
+# Epoch spike pulls
+Na_BL_spikes = BL_spikes[BL_spikes['unitID'].isin(clon_sens_ids)].copy()
+Na_FS_spikes = FS_spikes[FS_spikes['unitID'].isin(clon_sens_ids)].copy()
+Na_clon_spikes = cloninject_spikes[cloninject_spikes['unitID'].isin(clon_sens_ids)].copy()
+
+sio.savemat(f'NaBlSpikes{animal_num}.mat', {'NaBlSpikes': Na_BL_spikes.to_dict("list")})
+sio.savemat(f'NaFsSpikes{animal_num}.mat', {'NaFsSpikes': Na_FS_spikes.to_dict("list")})
+sio.savemat(f'NaClonSpikes{animal_num}.mat', {'NaClonSpikes': Na_clon_spikes.to_dict("list")})
+
+# ==== Adjust timestamps for raster ====
+
+def adjust_timestamps(df, start_time):
+    df = df.sort_values('timestamp').copy()
+    df['adjustedTimestamp'] = start_time + np.insert(np.cumsum(np.diff(df['timestamp'].values)), 0, 0)
+    return df
+
+Na_BL_spikes = adjust_timestamps(Na_BL_spikes, 0)
+Na_FS_spikes = adjust_timestamps(Na_FS_spikes, 900)
+adj_bl_fs_spikes = pd.concat([Na_BL_spikes, Na_FS_spikes], ignore_index=True)
+sio.savemat(f'adjBlFsSpikes{animal_num}.mat', {'adjBlFsSpikes': adj_bl_fs_spikes.to_dict("list")})
+
+Na_clon_spikes = adjust_timestamps(Na_clon_spikes, 1200)
+adj_raster_spikes = pd.concat([Na_BL_spikes, Na_FS_spikes, Na_clon_spikes], ignore_index=True)
